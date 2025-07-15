@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fullscreen USB Camera</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Apply Inter font and basic styling */
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            overflow: hidden; /* Hide scrollbars */
+            background-color: #1a202c; /* Dark background */
+            display: flex;
+            flex-direction: column; /* Allow vertical stacking for controls */
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh; /* Ensure it takes full viewport height */
+        }
+
+        /* Main content wrapper, will become fullscreen */
+        #mainContentWrapper {
+            display: flex; /* Use flexbox for side-by-side layout */
+            width: 100vw; /* Default to full width */
+            height: calc(100vh - 80px); /* Adjust height to make space for controls */
+            background-color: #000; /* Black background for video area */
+            transition: all 0.3s ease-in-out; /* Smooth transition for fullscreen */
+            border-radius: 10px; /* Rounded corners for the container */
+            overflow: hidden; /* Hide overflow from rounded corners */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+        }
+
+        /* Fullscreen specific styles for the main content wrapper */
+        #mainContentWrapper:fullscreen {
+            width: 100vw;
+            height: 100vh;
+            display: flex; /* Ensure flex layout when fullscreen */
+            flex-direction: row; /* Dock on left, video on right */
+            justify-content: flex-start; /* Align items to the start */
+            align-items: stretch; /* Stretch items to fill height */
+            border-radius: 0; /* Remove rounded corners in fullscreen */
+            box-shadow: none; /* Remove shadow in fullscreen */
+        }
+
+        /* Left panel (dock) styling */
+        .left-panel {
+            width: 0; /* Initially hidden or collapsed */
+            background-color: #253240; /* Very dark, subtle blue */
+            color: #ecf0f1;
+            padding: 0; /* No padding initially */
+            overflow: hidden; /* Hide content when collapsed */
+            transition: width 0.3s ease-in-out, padding 0.3s ease-in-out;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+            flex-shrink: 0; /* Prevent shrinking */
+            box-sizing: border-box; /* Include padding in width calculation */
+            gap: 15px; /* Spacing between dock elements */
+        }
+
+        /* Left panel styling when in fullscreen */
+        #mainContentWrapper:fullscreen .left-panel {
+            width: 100px; /* Fixed width for the dock */
+            padding: 15px 5px; /* Adjusted padding for smaller width */
+            border-right: 1px solid #4a5568;
+        }
+
+        /* Video container styling */
+        .video-container {
+            flex-grow: 1; /* Take remaining space */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #000;
+        }
+
+        /* Video container styling when in fullscreen */
+        #mainContentWrapper:fullscreen .video-container {
+            /* For a 1800x1200 display, with 100px dock, leaves 1700px for video */
+            width: calc(100vw - 100px); /* Take full width minus dock width */
+            height: 100%; /* Fill height */
+            flex-shrink: 0; /* Prevent shrinking */
+            justify-content: flex-end; /* Push video to the right within its container */
+            align-items: center; /* Center vertically */
+        }
+
+        video {
+            display: block;
+            width: 100%; /* Fill its container */
+            height: 100%; /* Fill its container */
+            object-fit: contain; /* Maintain aspect ratio, fit within container */
+            background-color: #000; /* Fallback background for video element */
+        }
+
+        /* Video styling when in fullscreen - ensure 1600x1200 fits within 1700x1200 area */
+        #mainContentWrapper:fullscreen video {
+            max-width: 1600px; /* Max width for the video itself */
+            max-height: 1200px; /* Max height for the video itself */
+            object-fit: contain; /* Maintain aspect ratio and fit within bounds */
+        }
+
+        /* Message box for errors or instructions */
+        .message-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 1000;
+            display: none; /* Hidden by default */
+        }
+
+        /* Controls container styling */
+        .controls-container {
+            display: flex;
+            gap: 15px;
+            padding: 15px;
+            background-color: #2d3748; /* Darker background for controls */
+            width: 100%;
+            justify-content: center;
+            align-items: center;
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
+            box-shadow: 0 -4px 6px rgba(0, 0, 0, 0.1);
+            position: relative;
+            z-index: 10; /* Ensure controls are above video if overlapping */
+        }
+
+        select, button {
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            border: none;
+        }
+
+        select {
+            background-color: #4a5568;
+            color: #fff;
+            appearance: none; /* Remove default select arrow */
+            padding-right: 30px; /* Space for custom arrow */
+            background-image: url('data:image/svg+xml;utf8,<svg fill="%23ffffff" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>');
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            background-size: 20px;
+        }
+
+        select:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.5); /* Blue focus ring */
+        }
+
+        button {
+            background-color: #4299e1; /* Blue button */
+            color: #fff;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background-color: #3182ce; /* Darker blue on hover */
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Dock specific button styling */
+        .left-panel button {
+            width: 80px; /* Fixed width for dock buttons */
+            padding: 8px 5px;
+            font-size: 0.85rem;
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .left-panel p {
+            font-size: 0.8rem;
+            text-align: center;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen">
+    <div id="mainContentWrapper" class="rounded-lg shadow-lg">
+        <div class="left-panel">
+            <h3 class="text-md font-bold mb-2">Dock</h3>
+            <button id="recordButton" class="rounded-lg bg-green-600 hover:bg-green-700">Record</button>
+            <p id="fpsDisplay" class="text-sm text-gray-300">FPS: N/A</p>
+            <p class="text-xs text-gray-400 mt-auto">
+                Ubuntu Desktop Info
+            </p>
+        </div>
+        <div class="video-container">
+            <video id="cameraFeed" autoplay playsinline class="rounded-lg"></video>
+            <div id="messageBox" class="message-box"></div>
+        </div>
+    </div>
+
+    <div class="controls-container rounded-b-lg">
+        <label for="cameraSelect" class="text-gray-300">Select Camera:</label>
+        <select id="cameraSelect" class="rounded-lg">
+            <!-- Options will be populated by JavaScript -->
+        </select>
+        <button id="switchCameraButton" class="rounded-lg">Switch Camera</button>
+        <button id="fullscreenButton" class="rounded-lg">Fullscreen</button>
+    </div>
+
+    <script>
+        const video = document.getElementById('cameraFeed');
+        const messageBox = document.getElementById('messageBox');
+        const cameraSelect = document.getElementById('cameraSelect');
+        const switchCameraButton = document.getElementById('switchCameraButton');
+        const fullscreenButton = document.getElementById('fullscreenButton');
+        const mainContentWrapper = document.getElementById('mainContentWrapper'); // Target for fullscreen
+        const recordButton = document.getElementById('recordButton');
+        const fpsDisplay = document.getElementById('fpsDisplay');
+
+        let currentStream; // To keep track of the current media stream
+        let mediaRecorder;
+        let recordedChunks = [];
+        let isRecording = false;
+
+        let lastFrameTime = 0;
+        let frameCount = 0;
+        let fpsIntervalId;
+        let messageTimeoutId; // To store the timeout ID for messages
+
+        // Function to display messages in the custom message box
+        // Messages will now automatically hide after a default duration (3 seconds)
+        // unless type is 'error' or a custom duration is provided.
+        function showMessage(message, type = 'info', duration = 3000) {
+            // Clear any existing timeout to prevent messages from disappearing too soon
+            if (messageTimeoutId) {
+                clearTimeout(messageTimeoutId);
+            }
+
+            messageBox.textContent = message;
+            messageBox.style.display = 'block';
+            if (type === 'error') {
+                messageBox.style.backgroundColor = 'rgba(220, 38, 38, 0.8)'; // Red for errors
+                // Error messages can be persistent until manually dismissed or new action
+                // No auto-hide by default for errors, unless a duration is explicitly given
+                if (duration > 0) { // Only set timeout if duration is positive
+                    messageTimeoutId = setTimeout(hideMessageBox, duration);
+                }
+            } else {
+                messageBox.style.backgroundColor = 'rgba(0, 0, 0, 0.8)'; // Black for info
+                messageTimeoutId = setTimeout(hideMessageBox, duration);
+            }
+        }
+
+        // Function to hide the message box
+        function hideMessageBox() {
+            messageBox.style.display = 'none';
+        }
+
+        // Function to stop the current camera stream
+        function stopCurrentStream() {
+            if (currentStream) {
+                console.log('Stopping current stream tracks...');
+                currentStream.getTracks().forEach(track => {
+                    track.stop(); // Stop each track in the stream
+                });
+                currentStream = null; // Clear the stream reference
+            }
+        }
+
+        // FPS Counter Logic
+        // This calculates the frames per second at which the <video> element is rendering frames.
+        // This directly corresponds to the FPS of the USB video feed being displayed.
+        function startFpsCounter() {
+            if (fpsIntervalId) clearInterval(fpsIntervalId); // Clear any existing interval
+
+            lastFrameTime = performance.now();
+            frameCount = 0;
+            fpsDisplay.textContent = `FPS: 0`; // Reset display
+
+            fpsIntervalId = setInterval(() => {
+                if (video.readyState >= 2) { // Check if video is playing (HAVE_CURRENT_DATA or more)
+                    const currentFps = frameCount;
+                    fpsDisplay.textContent = `FPS: ${currentFps}`;
+                    frameCount = 0; // Reset for next second
+                } else {
+                    fpsDisplay.textContent = `FPS: N/A`;
+                }
+            }, 1000); // Update every second
+
+            // Start the animation frame loop to count frames
+            requestAnimationFrame(updateFps);
+        }
+
+        function updateFps(currentTime) {
+            // Only count frames if video is playing and not paused
+            if (video.readyState >= 2 && !video.paused) {
+                frameCount++;
+            }
+            requestAnimationFrame(updateFps);
+        }
+
+        // Recording Functionality
+        function startRecording() {
+            if (!video.srcObject) {
+                showMessage('No camera feed available to record.', 'error', 5000); // Error message persists longer
+                return;
+            }
+
+            try {
+                recordedChunks = [];
+                // Use 'video/webm; codecs=vp8' for broader compatibility
+                mediaRecorder = new MediaRecorder(video.srcObject, { mimeType: 'video/webm; codecs=vp8' });
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        recordedChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    console.log('Recording stopped. Collected video data chunks:', recordedChunks);
+                    // You can add logic here to create a Blob and a download link:
+                    // const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                    // const url = URL.createObjectURL(blob);
+                    // const a = document.createElement('a');
+                    // a.href = url;
+                    // a.download = 'recorded-ubuntu-desktop.webm';
+                    // a.click();
+                    // URL.revokeObjectURL(url); // Clean up the object URL
+
+                    showMessage('Recording stopped. Video data collected (check console for chunks).', 'info');
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                recordButton.textContent = 'Stop';
+                recordButton.classList.remove('bg-green-600', 'hover:bg-green-700');
+                recordButton.classList.add('bg-red-600', 'hover:bg-red-700');
+                showMessage('Recording started...', 'info');
+            } catch (error) {
+                console.error('Error starting media recorder:', error);
+                showMessage(`Could not start recording: ${error.name} - ${error.message}`, 'error', 5000); // Error message persists longer
+                isRecording = false;
+                recordButton.textContent = 'Record';
+                recordButton.classList.remove('bg-red-600', 'hover:bg-red-700');
+                recordButton.classList.add('bg-green-600', 'hover:bg-green-700');
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                isRecording = false;
+                recordButton.textContent = 'Record';
+                recordButton.classList.remove('bg-red-600', 'hover:bg-red-700');
+                recordButton.classList.add('bg-green-600', 'hover:bg-green-700');
+            }
+        }
+
+        // Function to start the camera feed
+        async function startCamera(deviceId) {
+            hideMessageBox(); // Hide any previous messages
+            stopCurrentStream(); // Stop any existing stream before starting a new one
+            stopRecording(); // Stop any ongoing recording
+
+            // Define constraints for the camera feed
+            const constraints = {
+                video: {
+                    width: { ideal: 1600 }, // Reverted to 1600
+                    height: { ideal: 1200 }, // Ideal height
+                    deviceId: deviceId ? { exact: deviceId } : undefined, // Use specific deviceId if provided
+                    facingMode: deviceId ? undefined : 'user' // Default to 'user' if no specific deviceId
+                }
+            };
+
+            try {
+                // Request access to the user's media devices (camera)
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                currentStream = stream; // Store the current stream
+                video.srcObject = stream; // Set the video element's source to the camera stream
+
+                // When the video metadata is loaded, play the video
+                video.onloadedmetadata = () => {
+                    video.play();
+                    console.log(`Camera feed started with resolution: ${video.videoWidth}x${video.videoHeight}`);
+                    // Check if the ideal resolution was met
+                    if (video.videoWidth !== 1600 || video.videoHeight !== 1200) {
+                        showMessage(`Note: Requested resolution 1600x1200, actual resolution: ${video.videoWidth}x${video.videoHeight}. Your device might not support the exact resolution.`, 'info');
+                    } else {
+                        hideMessageBox(); // Hide message if resolution is ideal
+                    }
+                    startFpsCounter(); // Start FPS counter once video metadata is loaded
+                };
+            } catch (err) {
+                // Handle errors if camera access is denied or not available
+                console.error('Error accessing camera:', err);
+                if (err.name === 'NotAllowedError') {
+                    showMessage('Camera access denied. Please grant permission to use your camera.', 'error', 5000);
+                } else if (err.name === 'NotFoundError') {
+                    showMessage('No camera found. Please ensure a camera is connected and enabled.', 'error', 5000);
+                } else if (err.name === 'OverconstrainedError') {
+                    showMessage(`The requested resolution (1600x1200) is not supported by your camera, or the selected camera cannot provide it. Please try a different camera or resolution.`, 'error', 5000);
+                } else {
+                    showMessage(`An error occurred: ${err.message}. Please try again.`, 'error', 5000);
+                }
+                if (fpsIntervalId) clearInterval(fpsIntervalId);
+                fpsDisplay.textContent = `FPS: N/A`;
+            }
+        }
+
+        // Function to get and populate available cameras
+        async function getCameras() {
+            try {
+                // Request media devices to ensure permissions are granted before enumerating
+                // This is crucial to get actual device labels instead of empty strings
+                console.log('Requesting camera permissions...');
+                // Attempt to get a stream to ensure permissions are requested/granted
+                // This will also help populate actual device labels.
+                // We'll immediately stop the stream after enumeration if it's not the one we want to display.
+                let tempStream = null;
+                try {
+                    tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                    console.log('Camera permissions granted (or already granted).');
+                } catch (permissionErr) {
+                    console.warn('Initial getUserMedia for enumeration failed (likely permissions or no device):', permissionErr);
+                    // Don't show an error box here, as getCameras will handle it later.
+                }
+
+
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                console.log('All enumerated devices:', devices);
+
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                console.log('Filtered video devices:', videoDevices);
+
+                cameraSelect.innerHTML = ''; // Clear existing options
+
+                if (videoDevices.length === 0) {
+                    showMessage('No video input devices found. Please ensure camera is connected and permissions are granted.', 'error', 5000);
+                    switchCameraButton.disabled = true;
+                    fullscreenButton.disabled = true;
+                    recordButton.disabled = true;
+                    // Stop the temporary stream if it was created
+                    if (tempStream) {
+                        tempStream.getTracks().forEach(track => track.stop());
+                    }
+                    return;
+                }
+
+                videoDevices.forEach((device, index) => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    // Use device.label if available, otherwise a generic name
+                    option.textContent = device.label || `Camera ${index + 1} (ID: ${device.deviceId.substring(0, 8)}...)`;
+                    cameraSelect.appendChild(option);
+                });
+
+                switchCameraButton.disabled = false;
+                fullscreenButton.disabled = false;
+                recordButton.disabled = false;
+
+                // Start camera with the first available device
+                if (videoDevices.length > 0) {
+                    // If a temporary stream was opened for enumeration, stop it now
+                    if (tempStream) {
+                        tempStream.getTracks().forEach(track => track.stop());
+                    }
+                    startCamera(videoDevices[0].deviceId);
+                }
+
+            } catch (err) {
+                console.error('Error enumerating devices or getting initial permissions:', err);
+                if (err.name === 'NotAllowedError') {
+                    showMessage('Camera access denied. Please grant permission to list cameras.', 'error', 5000);
+                } else {
+                    showMessage(`An error occurred: ${err.message}. Could not list cameras.`, 'error', 5000);
+                }
+                switchCameraButton.disabled = true;
+                fullscreenButton.disabled = true;
+                recordButton.disabled = true;
+                if (fpsIntervalId) clearInterval(fpsIntervalId);
+                fpsDisplay.textContent = `FPS: N/A`;
+            }
+        }
+
+        // Function to toggle fullscreen mode
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                if (mainContentWrapper.requestFullscreen) {
+                    mainContentWrapper.requestFullscreen();
+                } else if (mainContentWrapper.mozRequestFullScreen) { /* Firefox */
+                    mainContentWrapper.mozRequestFullScreen();
+                } else if (mainContentWrapper.webkitRequestFullscreen) { /* Chrome, Safari and Opera */
+                    mainContentWrapper.webkitRequestFullscreen();
+                } else if (mainContentWrapper.msRequestFullscreen) { /* IE/Edge */
+                    mainContentWrapper.msRequestFullscreen();
+                }
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.mozCancelFullScreen) { /* Firefox */
+                    document.mozCancelFullScreen();
+                } else if (document.webkitExitFullscreen) { /* Chrome, Safari and Opera */
+                    document.webkitExitFullscreen();
+                } else if (document.msExitFullscreen) { /* IE/Edge */
+                    document.msExitFullscreen();
+                }
+            }
+        }
+
+        // Event listener for the "Switch Camera" button
+        switchCameraButton.addEventListener('click', () => {
+            const selectedDeviceId = cameraSelect.value;
+            if (selectedDeviceId) {
+                startCamera(selectedDeviceId);
+            } else {
+                showMessage('Please select a camera from the list.', 'info');
+            }
+        });
+
+        // Event listener for the "Fullscreen" button
+        fullscreenButton.addEventListener('click', toggleFullscreen);
+
+        // Event listener for the "Record" button
+        recordButton.addEventListener('click', () => {
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        });
+
+        // Start the camera and populate devices when the window loads
+        window.onload = getCameras;
+
+        // Optional: Add a resize observer to ensure video scales correctly on window resize
+        const resizeObserver = new ResizeObserver(entries => {
+            for (let entry of entries) {
+                if (entry.target === video) {
+                    console.log('Video container resized.');
+                }
+            }
+        });
+        resizeObserver.observe(video.parentElement); // Observe the video's parent container
+    </script>
+</body>
+</html>
