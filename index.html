@@ -230,11 +230,11 @@
         </div>
         <div class="right-dock dock-panel">
             <div class="dock-item">
-                <button id="printScreenButton" class="rounded-full">
-                    <!-- Camera Icon SVG -->
+                <button id="printScreenButton" class="rounded-full red-dot">
+                    <!-- Red Circle SVG -->
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="currentColor" width="1em" height="1em">
                         <!--! Font Awesome Free 6.5.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc. -->
-                        <path d="M149.1 64.8L138.7 96H64C28.7 96 0 124.7 0 160V416c0 35.3 28.7 64 64 64H448c35.3 0 64-28.7 64-64V160c0-35.3-28.7-64-64-64H373.3L362.9 64.8C354.7 40.2 320.7 32 296.1 40.2s-32 54.3-40.2 78.9L248.7 96H160c-11.5 0-22.6 3.6-31.9 10.3l-9.4 6.7zM256 384a96 96 0 1 0 0-192 96 96 0 1 0 0 192z"/>
+                        <path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512z"/>
                     </svg>
                 </button>
                 <p class="text-xs text-gray-400">Print Screen</p>
@@ -261,7 +261,7 @@
         const switchCameraButton = document.getElementById('switchCameraButton');
         const fullscreenButton = document.getElementById('fullscreenButton');
         const mainContentWrapper = document.getElementById('mainContentWrapper');
-        const printScreenButton = document.getElementById('printScreenButton'); // Renamed to printScreenButton
+        const printScreenButton = document.getElementById('printScreenButton');
         const fpsDisplay = document.getElementById('fpsDisplay');
 
         let currentStream;
@@ -400,7 +400,7 @@
                     showMessage('No video input devices found. Please ensure camera is connected and permissions are granted.', 'error', 5000);
                     switchCameraButton.disabled = true;
                     fullscreenButton.disabled = true;
-                    printScreenButton.disabled = true; // Disable print screen button
+                    printScreenButton.disabled = true;
                     if (tempStream) {
                         tempStream.getTracks().forEach(track => track.stop());
                     }
@@ -416,7 +416,7 @@
 
                 switchCameraButton.disabled = false;
                 fullscreenButton.disabled = false;
-                printScreenButton.disabled = false; // Enable print screen button
+                printScreenButton.disabled = false;
 
                 if (videoDevices.length > 0) {
                     if (tempStream) {
@@ -434,7 +434,7 @@
                 }
                 switchCameraButton.disabled = true;
                 fullscreenButton.disabled = true;
-                printScreenButton.disabled = true; // Disable print screen button
+                printScreenButton.disabled = true;
                 if (fpsCallbackId) {
                     video.cancelVideoFrameCallback(fpsCallbackId);
                     fpsCallbackId = null;
