@@ -62,7 +62,7 @@
 
         /* Dock styling when in fullscreen */
         #mainContentWrapper:fullscreen .dock-panel {
-            width: 100px; /* Fixed width for each dock */
+            width: 50px; /* Reduced fixed width for each dock */
             padding: 15px 5px; /* Adjusted padding for smaller width */
         }
 
@@ -87,25 +87,20 @@
 
         /* Video container styling when in fullscreen */
         #mainContentWrapper:fullscreen .video-container {
-            /* For a 1800x1200 display, with two 100px docks, leaves 1600px for video */
-            width: calc(100vw - 200px); /* Adjusted width: full width minus both dock widths */
+            /* On a 1800x1200 display, with two 50px docks, leaves 1700px for video */
+            width: calc(100vw - 100px); /* Adjusted width: full width minus both dock widths (50px + 50px) */
             height: 100%; /* Fill height */
             flex-shrink: 0; /* Prevent shrinking */
-            justify-content: center; /* Center video within its 1600px space */
+            justify-content: center; /* Center video within its 1700px space */
             align-items: center; /* Center vertically */
         }
 
         video {
             display: block;
-            width: 100%; /* Fill its container */
-            height: 100%; /* Fill its container */
-            object-fit: contain; /* Maintain aspect ratio, fit within container */
+            width: 100%; /* Fill its container (1700px) */
+            height: 100%; /* Fill its container (1200px) */
+            object-fit: fill; /* STRETCH to fill container, sacrificing aspect ratio */
             background-color: #000; /* Fallback background for video element */
-        }
-
-        /* Hidden canvas for capturing frames */
-        #captureCanvas {
-            display: none;
         }
 
         /* Message box for errors or instructions */
@@ -186,17 +181,26 @@
         .dock-panel .dock-item button {
             background: none; /* Remove background for icon button */
             border: 1px solid #4a5568; /* Subtle border */
-            width: 60px; /* Size for the icon button */
-            height: 60px;
+            width: 40px; /* Size for the icon button (smaller for 50px dock) */
+            height: 40px;
             display: flex;
             justify-content: center;
             align-items: center;
             margin: 0 auto; /* Center the button */
             color: #fff;
-            font-size: 2rem; /* Size of the icon */
+            font-size: 1.5rem; /* Size of the icon */
             border-radius: 50%; /* Make it circular */
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
+
+        .dock-panel .dock-item button.red-dot {
+            background-color: #dc2626; /* Red background for record */
+            border-color: #ef4444;
+        }
+        .dock-panel .dock-item button.red-dot:hover {
+            background-color: #b91c1c; /* Darker red on hover */
+        }
+
 
         .dock-panel .dock-item button:hover {
             background-color: #4a5568; /* Hover effect */
@@ -204,7 +208,7 @@
         }
 
         .dock-panel .dock-item p {
-            font-size: 0.8rem;
+            font-size: 0.7rem; /* Smaller font for smaller dock */
             color: #cbd5e0; /* Lighter gray for text */
             margin-top: 5px;
         }
@@ -222,19 +226,28 @@
         </div>
         <div class="video-container">
             <video id="cameraFeed" autoplay playsinline class="rounded-lg"></video>
-            <canvas id="captureCanvas"></canvas> <!-- Hidden canvas for capturing frames -->
             <div id="messageBox" class="message-box"></div>
         </div>
         <div class="right-dock dock-panel">
             <div class="dock-item">
-                <button id="captureButton" class="rounded-full">
-                    <!-- Camera Icon (Font Awesome - assumed available or use SVG) -->
+                <button id="screenshotButton" class="rounded-full">
+                    <!-- Camera Icon SVG -->
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="currentColor" width="1em" height="1em">
                         <!--! Font Awesome Free 6.5.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc. -->
                         <path d="M149.1 64.8L138.7 96H64C28.7 96 0 124.7 0 160V416c0 35.3 28.7 64 64 64H448c35.3 0 64-28.7 64-64V160c0-35.3-28.7-64-64-64H373.3L362.9 64.8C354.7 40.2 320.7 32 296.1 40.2s-32 54.3-40.2 78.9L248.7 96H160c-11.5 0-22.6 3.6-31.9 10.3l-9.4 6.7zM256 384a96 96 0 1 0 0-192 96 96 0 1 0 0 192z"/>
                     </svg>
                 </button>
-                <p class="text-xs text-gray-400">Capture</p>
+                <p class="text-xs text-gray-400">Screenshot</p>
+            </div>
+            <div class="dock-item">
+                <button id="screenRecordButton" class="rounded-full red-dot">
+                    <!-- Red Circle SVG -->
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="currentColor" width="1em" height="1em">
+                        <!--! Font Awesome Free 6.5.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc. -->
+                        <path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512z"/>
+                    </svg>
+                </button>
+                <p class="text-xs text-gray-400">Record</p>
             </div>
             <p class="text-xs text-gray-400 mt-auto">
                 Tools
@@ -253,56 +266,46 @@
 
     <script>
         const video = document.getElementById('cameraFeed');
-        const captureCanvas = document.getElementById('captureCanvas');
-        const ctx = captureCanvas.getContext('2d');
         const messageBox = document.getElementById('messageBox');
         const cameraSelect = document.getElementById('cameraSelect');
         const switchCameraButton = document.getElementById('switchCameraButton');
         const fullscreenButton = document.getElementById('fullscreenButton');
-        const mainContentWrapper = document.getElementById('mainContentWrapper'); // Target for fullscreen
-        const captureButton = document.getElementById('captureButton'); // Renamed from recordButton
+        const mainContentWrapper = document.getElementById('mainContentWrapper');
+        const screenshotButton = document.getElementById('screenshotButton');
+        const screenRecordButton = document.getElementById('screenRecordButton');
         const fpsDisplay = document.getElementById('fpsDisplay');
 
-        let currentStream; // To keep track of the current media stream
-        let messageTimeoutId; // To store the timeout ID for messages
+        let currentStream;
+        let messageTimeoutId;
 
-        let frameTimestamps = []; // To store timestamps for FPS calculation
-        let fpsCallbackId = null; // To store the ID for requestVideoFrameCallback
+        let frameTimestamps = [];
+        let fpsCallbackId = null;
 
         // Function to display messages in the custom message box
         function showMessage(message, type = 'info', duration = 3000) {
             if (messageTimeoutId) {
                 clearTimeout(messageTimeoutId);
             }
-
             messageBox.textContent = message;
             messageBox.style.display = 'block';
-            if (type === 'error') {
-                messageBox.style.backgroundColor = 'rgba(220, 38, 38, 0.8)'; // Red for errors
-                if (duration > 0) {
-                    messageTimeoutId = setTimeout(hideMessageBox, duration);
-                }
-            } else {
-                messageBox.style.backgroundColor = 'rgba(0, 0, 0, 0.8)'; // Black for info
+            messageBox.style.backgroundColor = type === 'error' ? 'rgba(220, 38, 38, 0.8)' : 'rgba(0, 0, 0, 0.8)';
+            if (duration > 0) {
                 messageTimeoutId = setTimeout(hideMessageBox, duration);
             }
         }
 
-        // Function to hide the message box
         function hideMessageBox() {
             messageBox.style.display = 'none';
         }
 
-        // Function to stop the current camera stream
         function stopCurrentStream() {
             if (currentStream) {
                 console.log('Stopping current stream tracks...');
                 currentStream.getTracks().forEach(track => {
-                    track.stop(); // Stop each track in the stream
+                    track.stop();
                 });
-                currentStream = null; // Clear the stream reference
+                currentStream = null;
             }
-            // Also stop the FPS callback if a stream is stopped
             if (fpsCallbackId) {
                 video.cancelVideoFrameCallback(fpsCallbackId);
                 fpsCallbackId = null;
@@ -312,110 +315,61 @@
 
         // Accurate FPS Calculation using requestVideoFrameCallback
         function startAccurateFpsCounter() {
-            frameTimestamps = []; // Reset timestamps
+            frameTimestamps = [];
             fpsDisplay.textContent = `FPS: N/A`;
 
-            // Define the callback function
             function videoFrameCallback(now, metadata) {
-                // metadata.presentedFrames is the total frames presented since the video started
-                // metadata.width, metadata.height are the current dimensions of the video track
-                // metadata.mediaTime is the media playback time in seconds
-
-                // Filter out timestamps older than 1 second
                 const oneSecondAgo = now - 1000;
                 frameTimestamps = frameTimestamps.filter(timestamp => timestamp > oneSecondAgo);
                 frameTimestamps.push(now);
 
-                // Update FPS display
                 fpsDisplay.textContent = `FPS: ${frameTimestamps.length}`;
 
-                // Request the next frame callback
-                if (video.srcObject) { // Only request if a stream is active
+                if (video.srcObject) {
                     fpsCallbackId = video.requestVideoFrameCallback(videoFrameCallback);
                 }
             }
 
-            // Start the first callback if video is ready
             if (video.readyState >= 2) {
                 fpsCallbackId = video.requestVideoFrameCallback(videoFrameCallback);
             } else {
-                // If video is not ready, wait for it to load
                 video.onloadedmetadata = () => {
-                    if (video.srcObject) { // Ensure stream is still active
+                    if (video.srcObject) {
                         fpsCallbackId = video.requestVideoFrameCallback(videoFrameCallback);
                     }
                 };
             }
         }
 
-        // Print Screen (Capture Frame) Functionality
-        function captureFrame() {
-            if (!video.srcObject || video.paused || video.ended) {
-                showMessage('No active video feed to capture.', 'error', 3000);
-                return;
-            }
-
-            // Set canvas dimensions to match video dimensions
-            captureCanvas.width = video.videoWidth;
-            captureCanvas.height = video.videoHeight;
-
-            // Draw the current video frame onto the canvas
-            ctx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
-
-            // Get the image data as a Data URL (PNG format)
-            const imageDataURL = captureCanvas.toDataURL('image/png');
-            console.log('Captured Frame Data URL (PNG):', imageDataURL);
-
-            // You could also convert to Blob for download if needed:
-            // captureCanvas.toBlob((blob) => {
-            //     console.log('Captured Frame Blob:', blob);
-            //     // Example: Create a download link for the Blob
-            //     // const url = URL.createObjectURL(blob);
-            //     // const a = document.createElement('a');
-            //     // a.href = url;
-            //     // a.download = `screenshot-${Date.now()}.png`;
-            //     // a.click();
-            //     // URL.revokeObjectURL(url);
-            // }, 'image/png');
-
-            showMessage('Screenshot captured! Check console for data.', 'info');
-        }
-
-        // Function to start the camera feed
         async function startCamera(deviceId) {
-            hideMessageBox(); // Hide any previous messages
-            stopCurrentStream(); // Stop any existing stream before starting a new one
+            hideMessageBox();
+            stopCurrentStream();
 
-            // Define constraints for the camera feed
             const constraints = {
                 video: {
-                    width: { ideal: 1600 }, // USB video resolution
-                    height: { ideal: 1200 }, // USB video resolution
-                    deviceId: deviceId ? { exact: deviceId } : undefined, // Use specific deviceId if provided
-                    facingMode: deviceId ? undefined : 'user' // Default to 'user' if no specific deviceId
+                    width: { ideal: 1600 }, // USB video input resolution
+                    height: { ideal: 1200 }, // USB video input resolution
+                    deviceId: deviceId ? { exact: deviceId } : undefined,
+                    facingMode: deviceId ? undefined : 'user'
                 }
             };
 
             try {
-                // Request access to the user's media devices (camera)
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                currentStream = stream; // Store the current stream
-                video.srcObject = stream; // Set the video element's source to the camera stream
+                currentStream = stream;
+                video.srcObject = stream;
 
-                // When the video metadata is loaded, play the video
                 video.onloadedmetadata = () => {
                     video.play();
                     console.log(`Camera feed started with resolution: ${video.videoWidth}x${video.videoHeight}`);
-                    // Check if the ideal resolution was met
                     if (video.videoWidth !== 1600 || video.videoHeight !== 1200) {
-                        showMessage(`Note: Requested resolution 1600x1200, actual resolution: ${video.videoWidth}x${video.videoHeight}. Your device might not support the exact resolution.`, 'info');
+                        showMessage(`Note: Requested resolution 1600x1200, actual resolution: ${video.videoWidth}x${video.videoHeight}. This will be stretched to 1700x1200 in fullscreen.`, 'info');
                     } else {
-                        hideMessageBox(); // Hide message if resolution is ideal
+                        hideMessageBox();
                     }
-                    startAccurateFpsCounter(); // Start accurate FPS counter
+                    startAccurateFpsCounter();
                 };
             } catch (err) {
-                // Handle errors if camera access is denied or not available
                 console.error('Error accessing camera:', err);
                 if (err.name === 'NotAllowedError') {
                     showMessage('Camera access denied. Please grant permission to use your camera.', 'error', 5000);
@@ -434,19 +388,15 @@
             }
         }
 
-        // Function to get and populate available cameras
         async function getCameras() {
             try {
                 console.log('Attempting to get camera permissions for enumeration...');
-                // Attempt to get a stream to ensure permissions are requested/granted
-                // This will help populate actual device labels.
                 let tempStream = null;
                 try {
                     tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
                     console.log('Initial camera permissions granted (or already granted).');
                 } catch (permissionErr) {
                     console.warn('Initial getUserMedia for enumeration failed (likely permissions or no device):', permissionErr);
-                    // Don't show an error box here, as the main error handling will cover it.
                 }
 
                 const devices = await navigator.mediaDevices.enumerateDevices();
@@ -455,13 +405,14 @@
                 const videoDevices = devices.filter(device => device.kind === 'videoinput');
                 console.log('Filtered video devices:', videoDevices);
 
-                cameraSelect.innerHTML = ''; // Clear existing options
+                cameraSelect.innerHTML = '';
 
                 if (videoDevices.length === 0) {
                     showMessage('No video input devices found. Please ensure camera is connected and permissions are granted.', 'error', 5000);
                     switchCameraButton.disabled = true;
                     fullscreenButton.disabled = true;
-                    captureButton.disabled = true;
+                    screenshotButton.disabled = true;
+                    screenRecordButton.disabled = true;
                     if (tempStream) {
                         tempStream.getTracks().forEach(track => track.stop());
                     }
@@ -471,18 +422,16 @@
                 videoDevices.forEach((device, index) => {
                     const option = document.createElement('option');
                     option.value = device.deviceId;
-                    // Use device.label if available, otherwise a generic name
                     option.textContent = device.label || `Camera ${index + 1} (ID: ${device.deviceId.substring(0, 8)}...)`;
                     cameraSelect.appendChild(option);
                 });
 
                 switchCameraButton.disabled = false;
                 fullscreenButton.disabled = false;
-                captureButton.disabled = false;
+                screenshotButton.disabled = false;
+                screenRecordButton.disabled = false;
 
-                // Start camera with the first available device
                 if (videoDevices.length > 0) {
-                    // If a temporary stream was opened for enumeration, stop it now
                     if (tempStream) {
                         tempStream.getTracks().forEach(track => track.stop());
                     }
@@ -498,7 +447,8 @@
                 }
                 switchCameraButton.disabled = true;
                 fullscreenButton.disabled = true;
-                captureButton.disabled = true;
+                screenshotButton.disabled = true;
+                screenRecordButton.disabled = true;
                 if (fpsCallbackId) {
                     video.cancelVideoFrameCallback(fpsCallbackId);
                     fpsCallbackId = null;
@@ -519,6 +469,8 @@
                 } else if (mainContentWrapper.msRequestFullscreen) { /* IE/Edge */
                     mainContentWrapper.msRequestFullscreen();
                 }
+                // Push a state into history to allow back button to exit fullscreen
+                history.pushState(null, null, '#fullscreen');
             } else {
                 if (document.exitFullscreen) {
                     document.exitFullscreen();
@@ -529,8 +481,28 @@
                 } else if (document.msExitFullscreen) { /* IE/Edge */
                     document.msExitFullscreen();
                 }
+                // When exiting fullscreen, remove the hash from history
+                if (window.location.hash === '#fullscreen') {
+                    history.back(); // Go back one step to remove the #fullscreen entry
+                }
             }
         }
+
+        // Handle browser's back button for fullscreen exit
+        window.addEventListener('popstate', (event) => {
+            // If the user navigates back and we are in fullscreen, exit fullscreen
+            if (document.fullscreenElement) {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+            // If the hash is '#fullscreen' and we're not in fullscreen, it means
+            // the user exited fullscreen via another method (e.g., Esc key),
+            // but the popstate for the hash might still fire. Clean it up.
+            if (window.location.hash === '#fullscreen' && !document.fullscreenElement) {
+                history.replaceState(null, null, window.location.pathname + window.location.search);
+            }
+        });
 
         // Event listener for the "Switch Camera" button
         switchCameraButton.addEventListener('click', () => {
@@ -545,13 +517,22 @@
         // Event listener for the "Fullscreen" button
         fullscreenButton.addEventListener('click', toggleFullscreen);
 
-        // Event listener for the "Capture" button (formerly Record)
-        captureButton.addEventListener('click', captureFrame);
+        // Event listener for the Screenshot button (camera icon)
+        screenshotButton.addEventListener('click', () => {
+            // Inform the user about the FydeOS/ChromeOS native screenshot shortcut
+            showMessage('Press Ctrl + Overview key (F5) for full screenshot.', 'info', 4000);
+            console.log('Instructing user to press FydeOS Screenshot Shortcut (Ctrl + Overview)');
+        });
 
-        // Start the camera and populate devices when the window loads
+        // Event listener for the Screen Record button (red circle)
+        screenRecordButton.addEventListener('click', () => {
+            // Inform the user about the FydeOS/ChromeOS native screen recording shortcut
+            showMessage('Press Ctrl + Shift + Overview key (F5) to start/stop screen recording.', 'info', 4000);
+            console.log('Instructing user to press FydeOS Screen Record Shortcut (Ctrl + Shift + Overview)');
+        });
+
         window.onload = getCameras;
 
-        // Optional: Add a resize observer to ensure video scales correctly on window resize
         const resizeObserver = new ResizeObserver(entries => {
             for (let entry of entries) {
                 if (entry.target === video) {
@@ -559,7 +540,7 @@
                 }
             }
         });
-        resizeObserver.observe(video.parentElement); // Observe the video's parent container
+        resizeObserver.observe(video.parentElement);
     </script>
 </body>
 </html>
