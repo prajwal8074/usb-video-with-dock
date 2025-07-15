@@ -53,7 +53,7 @@
             transition: width 0.3s ease-in-out, padding 0.3s ease-in-out;
             display: flex;
             flex-direction: column;
-            justify-content: flex-start;
+            justify-content: space-between; /* Distribute items vertically */
             align-items: center;
             flex-shrink: 0; /* Prevent shrinking */
             box-sizing: border-box; /* Include padding in width calculation */
@@ -176,7 +176,7 @@
         .dock-panel .dock-item {
             width: 100%; /* Make items fill dock width */
             text-align: center;
-            margin-bottom: 10px; /* Spacing between items */
+            /* margin-bottom: 10px; Removed, let gap handle it */
         }
 
         .dock-panel .dock-item button {
@@ -214,22 +214,24 @@
             margin-top: 5px;
         }
 
-        /* Vertical Slider Styles */
+        /* Vertical Slider Container Styles */
         .vertical-slider-container {
             display: flex;
             flex-direction: column;
             align-items: center;
-            margin-top: 20px; /* Spacing from elements above */
-            margin-bottom: 10px;
+            flex-grow: 1; /* Allow it to grow and fill available space */
+            justify-content: center; /* Center slider vertically within its expanded space */
+            padding-top: 10px; /* Add some padding to separate from elements above */
+            padding-bottom: 10px; /* Add some padding to separate from elements below */
         }
 
         .vertical-slider {
             -webkit-appearance: none;
-            width: 8px; /* Width of the track */
-            height: 80px; /* Height of the slider */
-            background: #4a5568; /* Track color */
+            width: 20px; /* Wider track for "large slider" */
+            height: 100%; /* Fill the height of its parent container */
+            background: #4a5568; /* Track color (darker blue from dock theme) */
             outline: none;
-            border-radius: 4px;
+            border-radius: 10px; /* More rounded for larger size */
             /* Rotate to make it vertical, then rotate again for thumb */
             transform: rotate(180deg);
             transform-origin: center;
@@ -239,31 +241,23 @@
         .vertical-slider::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
-            width: 18px; /* Size of the thumb */
-            height: 18px;
-            background: #4299e1; /* Thumb color */
-            border-radius: 50%;
+            width: 20px; /* Match track width for bar look */
+            height: 20px; /* Height of the thumb bar */
+            background: #4299e1; /* Accent blue for active part */
+            border-radius: 5px; /* Slightly rounded corners for the bar */
             cursor: pointer;
-            border: 2px solid #fff;
-            box-shadow: 0 0 2px rgba(0,0,0,0.5);
+            border: none; /* No border */
+            box-shadow: 0 0 5px rgba(0,0,0,0.5); /* Subtle shadow */
         }
 
         .vertical-slider::-moz-range-thumb {
-            width: 18px;
-            height: 18px;
+            width: 20px;
+            height: 20px;
             background: #4299e1;
-            border-radius: 50%;
+            border-radius: 5px;
             cursor: pointer;
-            border: 2px solid #fff;
-            box-shadow: 0 0 2px rgba(0,0,0,0.5);
-        }
-
-        /* Adjust spacing for items in docks */
-        .left-dock .dock-item:first-child {
-            margin-top: 0; /* Remove top margin for the very first item */
-        }
-        .right-dock .dock-item:first-child {
-            margin-top: 0;
+            border: none;
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
         }
     </style>
 </head>
@@ -273,11 +267,11 @@
             <div class="dock-item">
                 <p id="fpsDisplay" class="text-sm font-bold">FPS: N/A</p>
             </div>
-            <div class="dock-item mt-4"> <!-- Spacing for temperature -->
+            <div class="dock-item"> <!-- No mt-4 here, gap handles spacing -->
                 <p id="tempDisplay" class="text-sm font-bold">Temp: N/A</p>
                 <p class="text-xs text-gray-500">(Browser limitation)</p>
             </div>
-            <div class="vertical-slider-container mt-auto"> <!-- Volume control at bottom -->
+            <div class="vertical-slider-container"> <!-- Volume control at bottom -->
                 <!-- Volume Icon -->
                 <svg class="w-5 h-5 mb-1 text-gray-300" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 10v4h3l4 4V6l-4 4H5zm13.5 2c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
@@ -285,6 +279,9 @@
                 <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="1" class="vertical-slider">
                 <p class="text-xs text-gray-500">(Video only)</p>
             </div>
+            <p class="text-xs text-gray-400 mt-auto"> <!-- This will push to the very bottom -->
+                System Info
+            </p>
         </div>
         <div class="video-container">
             <video id="cameraFeed" autoplay playsinline class="rounded-lg"></video>
@@ -301,7 +298,7 @@
                 </button>
                 <p class="text-xs text-gray-400">Print Screen</p>
             </div>
-            <div class="vertical-slider-container mt-auto"> <!-- Brightness control at bottom -->
+            <div class="vertical-slider-container"> <!-- Brightness control at bottom -->
                 <!-- Brightness Icon -->
                 <svg class="w-5 h-5 mb-1 text-gray-300" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M20 15.31L22.31 13 20 10.69V8h-2.69L15.31 5.69 13 8l-2.31-2.31L8 8.01v2.68L5.69 13 8 15.31v2.69h2.69L13 22.31l2.31-2.31H18v-2.69zM12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6z"/>
@@ -309,6 +306,9 @@
                 <input type="range" id="brightnessSlider" min="0" max="200" value="100" class="vertical-slider">
                 <p class="text-xs text-gray-500">(Video only)</p>
             </div>
+            <p class="text-xs text-gray-400 mt-auto"> <!-- This will push to the very bottom -->
+                Tools
+            </p>
         </div>
     </div>
 
@@ -330,9 +330,10 @@
         const mainContentWrapper = document.getElementById('mainContentWrapper');
         const printScreenButton = document.getElementById('printScreenButton');
         const fpsDisplay = document.getElementById('fpsDisplay');
-        const tempDisplay = document.getElementById('tempDisplay'); // New element for temperature
-        const volumeSlider = document.getElementById('volumeSlider'); // New element for volume slider
-        const brightnessSlider = document.getElementById('brightnessSlider'); // New element for brightness slider
+        const tempDisplay = document.getElementById('tempDisplay'); // Element for temperature
+
+        const volumeSlider = document.getElementById('volumeSlider');
+        const brightnessSlider = document.getElementById('brightnessSlider');
 
         let currentStream;
         let messageTimeoutId;
