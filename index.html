@@ -78,12 +78,21 @@
 
         /* Video container styling */
         .video-container {
-            flex-grow: 1; /* Take remaining space (1600px) */
+            flex-grow: 1; /* Take remaining space */
             display: flex;
             justify-content: center;
             align-items: center;
             background-color: #000;
-            /* In fullscreen, this will be 1600px wide due to flex-grow and fixed dock widths */
+        }
+
+        /* Video container styling when in fullscreen */
+        #mainContentWrapper:fullscreen .video-container {
+            /* For a 1800x1200 display, with two 100px docks, leaves 1600px for video */
+            width: calc(100vw - 200px); /* Adjusted width: full width minus both dock widths */
+            height: 100%; /* Fill height */
+            flex-shrink: 0; /* Prevent shrinking */
+            justify-content: center; /* Center video within its 1600px space */
+            align-items: center; /* Center vertically */
         }
 
         video {
