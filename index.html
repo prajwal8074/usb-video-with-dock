@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Camera View</title>
+    <style>
+        /* Basic Styling */
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            overflow: hidden;
+            background-color: #1a202c;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* Main Content Wrapper */
+        #mainContentWrapper {
+            display: flex;
+            width: 100vw;
+            height: calc(100vh - 80px);
+            background-color: #000;
+            transition: all 0.3s ease-in-out;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        #mainContentWrapper:fullscreen {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: stretch;
+            border-radius: 0;
+            box-shadow: none;
+        }
+
+        /* Dock Styling */
+        .dock-panel {
+            width: 0;
+            background-color: #253240;
+            color: #ecf0f1;
+            padding: 0;
+            overflow: hidden;
+            transition: width 0.3s ease-in-out, padding 0.3s ease-in-out;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            box-sizing: border-box;
+            gap: 15px;
+        }
+
+        #mainContentWrapper:fullscreen .dock-panel {
+            width: 65px;
+            padding: 15px 5px;
+        }
+
+        #mainContentWrapper:fullscreen .left-dock { border-right: 1px solid #4a5568; }
+        #mainContentWrapper:fullscreen .right-dock { border-left: 1px solid #4a5568; }
+
+        /* Video Container */
+        .video-container {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #000;
+        }
+
+        #mainContentWrapper:fullscreen .video-container {
+            width: calc(100vw - 130px);
+            height: 100%;
+            flex-shrink: 0;
+        }
+
+        video {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: fill;
+            background-color: #000;
+        }
+
+        /* Message Box */
+        .message-box {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 1000;
+            display: none;
+        }
+
+        /* Controls Container */
+        .controls-container {
+            display: flex;
+            gap: 15px;
+            padding: 15px;
+            background-color: #2d3748;
+            width: 100%;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 -4px 6px rgba(0, 0, 0, 0.1);
+            position: relative;
+            z-index: 10;
+        }
+
+        select, button {
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            border: none;
+        }
+
+        select {
+            background-color: #4a5568;
+            color: #fff;
+        }
+
+        button {
+            background-color: #4299e1;
+            color: #fff;
+            font-weight: bold;
+        }
+        button:hover { background-color: #3182ce; }
+
+        /* Dock Item Styling */
+        .dock-panel .dock-item {
+            width: 100%;
+            text-align: center;
+        }
+
+        .dock-panel .dock-item button {
+            background-color: #4a7aa8;
+            border: 1px solid #4a7aa8;
+            width: 43px; /* Increased button size to accommodate larger icon */
+            height: 43px; /* Increased button size to accommodate larger icon */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto;
+            color: #fff;
+            /* font-size: 1.5rem; This mainly affects text, not SVGs, so can be removed or kept for other text */
+            border-radius: 33%;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .dock-panel .dock-item button svg {
+            width: 36px; /* Significantly increased size for icons */
+            height: 36px; /* Significantly increased size for icons */
+            /* Optionally add !important if absolutely necessary, but try without first */
+            /* width: 36px !important; */
+            /* height: 36px !important; */
+        }
+    
+        .dock-panel .dock-item button:hover {
+            background-color: #154c7e;
+            transform: scale(1.05);
+        }
+
+        .dock-panel .dock-item p {
+            font-size: 0.7rem;
+            color: #cbd5e0;
+            margin-top: 5px;
+        }
+        
+        #recordButton.is-recording {
+            background-color: #dc2626;
+            border-color: #ef4444;
+            animation: pulse-red 2s infinite;
+        }
+
+        @keyframes pulse-red {
+          0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+          70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }
+          100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+        }
+
+        /* Vertical Slider Styling */
+        .vertical-slider-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-grow: 1;
+            justify-content: center;
+            padding: 5px 0;
+            /* Added some spacing for better visual separation in the example */
+            margin: 0 10px;
+        }
+        
+        .vertical-slider {
+            width: 30px; /* Adjust as needed for desired thickness */
+            height: 100%;
+            background: #4a7aa8; /* Lighter shade of #154c7e for the unfilled track */
+            outline: none;
+            border-radius: 15px; /* Half of the width for rounded ends */
+            cursor: pointer;
+            -webkit-appearance: none; /* Remove default WebKit styles */
+            appearance: none; /* Remove default styles */
+            margin: 0; /* Remove default margin */
+        
+            /* Fill from bottom up */
+            /* The linear-gradient now uses two colors: the fill color and the track color */
+            background-image: linear-gradient(to top, #154c7e var(--fill-percent, 0%), #4a7aa8 var(--fill-percent, 0%));
+            background-repeat: no-repeat;
+            background-size: 100% 100%; /* Ensure background covers the whole element */
+            background-position: bottom; /* Ensure fill starts from the bottom */
+        }
+        
+        /* WebKit (Chrome, Safari, Edge) thumb styles - making it invisible */
+        .vertical-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 0; /* Make width 0 */
+            height: 0; /* Make height 0 */
+            background: transparent; /* Make background transparent */
+            border: none; /* Remove any border */
+            box-shadow: none; /* Remove any shadow */
+            cursor: pointer; /* Keep cursor for interaction */
+        }
+        
+        /* Mozilla (Firefox) thumb styles - making it invisible */
+        .vertical-slider::-moz-range-thumb {
+            width: 0; /* Make width 0 */
+            height: 0; /* Make height 0 */
+            background: transparent; /* Make background transparent */
+            border: none; /* Remove any border */
+            box-shadow: none; /* Remove any shadow */
+            cursor: pointer; /* Keep cursor for interaction */
+        }
+        
+        /* Track styles for Firefox (to ensure consistent thickness) */
+        .vertical-slider::-moz-range-track {
+            background: #4a7aa8; /* Lighter shade of #154c7e */
+            border-radius: 6px;
+            height: 12px; /* Match the slider width */
+        }
+        
+        /* Filled portion for Firefox */
+        .vertical-slider::-moz-range-progress {
+            background: #154c7e; /* Fill color */
+            border-radius: 6px;
+            height: 12px; /* Match the slider width */
+        }
+        
+        /* Focus state for accessibility */
+        .vertical-slider:focus {
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(21, 76, 126, 0.3); /* Focus ring with the new color */
+        }
+
+    </style>
+</head>
+<body class="bg-gray-900 text-white">
+    <div id="mainContentWrapper">
+        <div class="left-dock dock-panel">
+            <div class="dock-item"><p id="fpsDisplay" class="font-bold">FPS: N/A</p></div>
+            <div class="dock-item"><p id="tempDisplay" class="font-bold">Temp: N/A</p></div>
+            <div class="vertical-slider-container">
+                <svg class="w-5 h-5 mb-1" fill="currentColor" viewBox="0 0 24 24"><path d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 10v4h3l4 4V6l-4 4H5z"/></svg>
+                <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="1" class="vertical-slider">
+                <p class="text-xs text-gray-500">(Video)</p>
+            </div>
+            <p class="text-xs text-gray-400 mt-auto">System Info</p>
+        </div>
+
+        <div class="video-container">
+            <video id="cameraFeed" autoplay playsinline></video>
+            <div id="messageBox" class="message-box"></div>
+        </div>
+
+        <div class="right-dock dock-panel">
+            <div class="dock-item">
+                <button id="recordButton"><svg viewBox="0 0 512 512" fill="currentColor" width="1em" height="1em"><path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512z"/></svg></button>
+                <p id="recordButtonText" class="text-xs">Record Tab</p>
+            </div>
+
+            <div class="dock-item">
+                <button id="mediaNextButton">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+                </button>
+                <p class="text-xs">Next Track</p>
+            </div>
+            
+            <div class="dock-item">
+                <button id="screenshotButton">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                </button>
+                <p class="text-xs">Screenshot</p>
+            </div>
+
+            <div class="vertical-slider-container">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/>
+                    <line x1="15" y1="12" x2="23" y2="12" />
+                    <line x1="13.5" y1="14.598" x2="17.5" y2="21.526" />
+                    <line x1="10.5" y1="14.598" x2="6.5" y2="21.526" />
+                    <line x1="9" y1="12" x2="1" y2="12" />
+                    <line x1="10.5" y1="9.402" x2="6.5" y2="2.474" />
+                    <line x1="13.5" y1="9.402" x2="17.5" y2="2.474" />
+                </svg><br>
+                <input type="range" id="brightnessSlider" min="0" max="1" step="0.01" value="0" class="vertical-slider">
+                <p class="text-xs text-gray-500">(System)</p>
+            </div>
+            <p class="text-xs text-gray-400 mt-auto">Tools</p>
+        </div>
+    </div>
+
+    <div class="controls-container">
+        <label for="cameraSelect">Select Camera:</label>
+        <select id="cameraSelect"></select>
+        <button id="fullscreenButton">Fullscreen</button>
+    </div>
+
+    <script src="script.js" defer></script>
+</body>
+</html>

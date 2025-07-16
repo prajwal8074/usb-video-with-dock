@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Advanced Camera View",
+  "version": "1.2",
+  "description": "A USB camera viewer with system controls for brightness, CPU temp, and screen capture.",
+  "permissions": [
+    "system.cpu",
+    "system.display",
+    "tabCapture",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_icon": "icon.png",
+    "default_title": "Open Advanced Camera View"
+  },
+  "icons": {
+    "128": "icon.png"
+  }
+}
