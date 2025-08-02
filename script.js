@@ -1,293 +1,324 @@
 // DOM Elements
-        const video = document.getElementById('cameraFeed');
-        const messageBox = document.getElementById('messageBox');
-        const cameraSelect = document.getElementById('cameraSelect');
-        const fullscreenButton = document.getElementById('fullscreenButton');
-        const mainContentWrapper = document.getElementById('mainContentWrapper');
-        const fpsDisplay = document.getElementById('fpsDisplay');
-        const tempDisplay = document.getElementById('tempDisplay');
-        const volumeSlider = document.getElementById('volumeSlider');
-        const brightnessSlider = document.getElementById('brightnessSlider');
-        const recordButton = document.getElementById('recordButton');
-        const recordButtonText = document.getElementById('recordButtonText');
-        const screenshotButton = document.getElementById('screenshotButton');
-        const mediaNextButton = document.getElementById('mediaNextButton');
+const video = document.getElementById('cameraFeed');
+const messageBox = document.getElementById('messageBox');
+const cameraSelect = document.getElementById('cameraSelect');
+const fullscreenButton = document.getElementById('fullscreenButton');
+const mainContentWrapper = document.getElementById('mainContentWrapper');
+const fpsDisplay = document.getElementById('fpsDisplay');
+const tempDisplay = document.getElementById('tempDisplay');
+const wifiSpeedDisplay = document.getElementById('wifiSpeedDisplay');
+const volumeSlider = document.getElementById('volumeSlider');
+const recordButton = document.getElementById('recordButton');
+const recordButtonText = document.getElementById('recordButtonText');
+const screenshotButton = document.getElementById('screenshotButton');
+const mediaNextButton = document.getElementById('mediaNextButton');
+const mediaPauseButton = document.getElementById('mediaPauseButton');
+const mediaPrevButton = document.getElementById('mediaPrevButton');
+const youtubeRewindButton = document.getElementById('youtubeRewindButton');
+const youtubeForwardButton = document.getElementById('youtubeForwardButton');
 
-        // State
-        let currentStream, messageTimeoutId, fpsCallbackId, mediaRecorder;
-        let frameTimestamps = [], recordedChunks = [], isRecording = false;
+// State
+let currentStream, messageTimeoutId, fpsCallbackId, mediaRecorder;
+let frameTimestamps = [], recordedChunks = [], isRecording = false;
+let lastControlledTabId = null; // Keep track of the last tab we sent a command to
 
-        // --- Utility Functions ---
-        function showMessage(message, type = 'info', duration = 3000) {
-            if (messageTimeoutId) clearTimeout(messageTimeoutId);
-            messageBox.textContent = message;
-            messageBox.style.display = 'block';
-            messageBox.style.backgroundColor = type === 'error' ? 'rgba(220, 38, 38, 0.8)' : 'rgba(0, 0, 0, 0.8)';
-            if (duration > 0) messageTimeoutId = setTimeout(() => messageBox.style.display = 'none', duration);
-        }
+// SVG Icons for Play/Pause button
+const playIconSVG = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>`;
+const pauseIconSVG = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"></path></svg>`;
 
-        function updateSliderFill(slider) {
-            const percentage = ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
-            slider.style.setProperty('--fill-percent', `${percentage}%`);
-        }
 
-        // ADD THIS NEW FUNCTION
-        function setupInteractiveSlider(slider) {
-            const setValueFromEvent = (e) => {
-                const rect = slider.getBoundingClientRect();
-                // Calculate click position as a percentage from the bottom (0.0) to the top (1.0)
-                const percentage = Math.max(0, Math.min(1, (rect.bottom - e.clientY) / rect.height));
-        
-                const min = parseFloat(slider.min);
-                const max = parseFloat(slider.max);
-        
-                // Set the slider's value based on the calculated percentage
-                slider.value = min + (max - min) * percentage;
-        
-                // Manually trigger the 'input' event so that other listeners will fire
-                slider.dispatchEvent(new Event('input'));
-            };
-        
-            slider.addEventListener('pointerdown', (e) => {
-                setValueFromEvent(e); // Set value on initial click
-        
-                const onPointerMove = (moveEvent) => {
-                    setValueFromEvent(moveEvent);
-                };
-        
-                const onPointerUp = () => {
-                    window.removeEventListener('pointermove', onPointerMove);
-                    window.removeEventListener('pointerup', onPointerUp);
-                };
-        
-                // Add listeners to the window to handle dragging outside the slider
-                window.addEventListener('pointermove', onPointerMove);
-                window.addEventListener('pointerup', onPointerUp);
-            });
-        }
+// --- Utility Functions ---
+function showMessage(message, type = 'info', duration = 3000) {
+    if (messageTimeoutId) clearTimeout(messageTimeoutId);
+    messageBox.textContent = message;
+    messageBox.style.display = 'block';
+    messageBox.style.backgroundColor = type === 'error' ? 'rgba(220, 38, 38, 0.8)' : 'rgba(0, 0, 0, 0.8)';
+    if (duration > 0) messageTimeoutId = setTimeout(() => messageBox.style.display = 'none', duration);
+}
 
-        // --- Camera & FPS Logic ---
-        function stopCurrentStream() {
-            if (currentStream) currentStream.getTracks().forEach(track => track.stop());
-            if (fpsCallbackId) video.cancelVideoFrameCallback(fpsCallbackId);
-            currentStream = null;
-            fpsCallbackId = null;
-            fpsDisplay.textContent = 'FPS: N/A';
-        }
+// --- Camera & FPS Logic ---
+function stopCurrentStream() {
+    if (currentStream) currentStream.getTracks().forEach(track => track.stop());
+    if (fpsCallbackId) video.cancelVideoFrameCallback(fpsCallbackId);
+    currentStream = null;
+    fpsCallbackId = null;
+    fpsDisplay.textContent = 'FPS: N/A';
+}
 
-        function startAccurateFpsCounter() {
-            frameTimestamps = [];
-            const cb = now => {
-                const oneSecAgo = now - 1000;
-                frameTimestamps = frameTimestamps.filter(t => t > oneSecAgo);
-                frameTimestamps.push(now);
-                fpsDisplay.textContent = `FPS: ${frameTimestamps.length}`;
-                if (video.srcObject) fpsCallbackId = video.requestVideoFrameCallback(cb);
-            };
-            if (video.readyState >= 2) fpsCallbackId = video.requestVideoFrameCallback(cb);
-        }
+function startAccurateFpsCounter() {
+    frameTimestamps = [];
+    const cb = now => {
+        const oneSecAgo = now - 1000;
+        frameTimestamps = frameTimestamps.filter(t => t > oneSecAgo);
+        frameTimestamps.push(now);
+        fpsDisplay.textContent = `FPS: ${frameTimestamps.length}`;
+        if (video.srcObject) fpsCallbackId = video.requestVideoFrameCallback(cb);
+    };
+    if (video.readyState >= 2) fpsCallbackId = video.requestVideoFrameCallback(cb);
+}
 
-        async function startCamera(deviceId) {
-            stopCurrentStream();
-            const constraints = {
-                video: {
-                    deviceId: deviceId ? { exact: deviceId } : undefined, // Add this line
-                    width: { ideal: 1600 },
-                    height: { ideal: 1200 }
-                }
-            };
-            try {
-                currentStream = await navigator.mediaDevices.getUserMedia(constraints);
-                video.srcObject = currentStream;
-                video.onloadedmetadata = () => { video.play(); startAccurateFpsCounter(); };
-            } catch (err) {
-                showMessage(`Error starting camera: ${err.message}`, 'error');
-            }
-        }
-        
-        function takeTabScreenshot() {
-            // UPDATED: This function now captures only the video frame, not the docks.
-            if (!currentStream || !video.videoWidth) {
-                showMessage('Camera not active.', 'error');
-                return;
-            }
-        
-            // Create an in-memory canvas to draw the video frame on
-            const canvas = document.createElement('canvas');
-            // Set canvas dimensions to the video's actual resolution
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-        
-            // Draw the current video frame to the canvas
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-            // Create a download link from the canvas data
-            const dataUrl = canvas.toDataURL('image/png');
-            const link = document.createElement('a');
-            link.href = dataUrl;
-            link.download = `capture-${Date.now()}.png`;
-            link.click();
-            showMessage('Screenshot saved!', 'info', 2000);
-        }
+async function startCamera(deviceId) {
+    stopCurrentStream();
+    const constraints = { video: { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } } };
+    try {
+        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = currentStream;
+        video.onloadedmetadata = () => { video.play(); startAccurateFpsCounter(); };
+    } catch (err) {
+        showMessage(`Error starting camera: ${err.message}`, 'error');
+    }
+}
 
-        async function getCameras() {
-            let tempStream = null; // Variable to hold the temporary stream
-            try {
-                // Get a temporary stream to trigger the permission prompt
-                tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                const videoDevices = devices.filter(d => d.kind === 'videoinput');
-        
-                cameraSelect.innerHTML = '';
-                if (videoDevices.length === 0) {
-                    showMessage('No cameras found.', 'error');
-                    return;
-                }
-                
-                videoDevices.forEach(d => {
-                    const option = document.createElement('option');
-                    option.value = d.deviceId;
-                    option.textContent = d.label || `Camera ${cameraSelect.options.length + 1}`;
-                    cameraSelect.appendChild(option);
-                });
-                // Start the selected camera
-                startCamera(cameraSelect.value);
-            } catch (err) {
-                showMessage(`Could not list cameras: ${err.name}: ${err.message}`, 'error');
-                console.error(err);
-            } finally {
-                // CRUCIAL: Always stop the temporary stream tracks to turn off the camera light
-                if (tempStream) {
-                    tempStream.getTracks().forEach(track => track.stop());
-                }
-            }
-        }
+function takeTabScreenshot() {
+    if (!currentStream || !video.videoWidth) { showMessage('Camera not active.', 'error'); return; }
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/png');
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    link.download = `capture-${Date.now()}.png`;
+    link.click();
+    showMessage('Screenshot saved!', 'info', 2000);
+}
 
-        // --- Chrome Extension API Functions ---
-        function getCPUInfo() {
-            if (!chrome.system || !chrome.system.cpu) return;
-            chrome.system.cpu.getInfo(cpu => {
-                if (chrome.runtime.lastError || !cpu.temperatures || cpu.temperatures.length === 0) {
-                    tempDisplay.textContent = "Temp: N/A"; return;
-                }
-                tempDisplay.textContent = `Temp: ${cpu.temperatures[0]}°C`;
-            });
-        }
-
-        function setSystemBrightness(level) {
-            // if (!chrome.system || !chrome.system.display) return;
-            // chrome.system.display.getInfo(d => {
-            //     if (!chrome.runtime.lastError) chrome.system.display.setDisplayProperties(d[0].id, { brightness: level });
-            // });
-        }
-
-        function startRecording() {
-            if (!currentStream) {
-                showMessage('Camera not active.', 'error');
-                return;
-            }
-            isRecording = true;
-            recordButton.classList.add('is-recording');
-            recordButtonText.textContent = 'Stop Recording';
-            recordedChunks = [];
-            
-            // Note: Recording the camera stream, not the tab.
-            mediaRecorder = new MediaRecorder(currentStream, { mimeType: 'video/webm' });
-            mediaRecorder.ondataavailable = event => {
-                if (event.data.size > 0) recordedChunks.push(event.data);
-            };
-            mediaRecorder.onstop = () => {
-                const blob = new Blob(recordedChunks, { type: 'video/webm' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `recording-${Date.now()}.webm`;
-                a.click();
-                URL.revokeObjectURL(url);
-                showMessage('Recording saved!', 'info');
-            };
-            mediaRecorder.start();
-        }
-
-        function stopRecording() {
-            if (mediaRecorder) mediaRecorder.stop();
-            isRecording = false;
-            recordButton.classList.remove('is-recording');
-            recordButtonText.textContent = 'Record';
-        }
-
-        function triggerMediaNext() {
-            chrome.tabs.query({ audible: true }, (tabs) => {
-                if (tabs.length === 0) { showMessage('No tab is playing audio.', 'info', 2000); return; }
-                const targetTab = tabs[0];
-                chrome.scripting.executeScript({
-                    target: { tabId: targetTab.id },
-                    function: clickNextButtonOnPage,
-                }, (results) => {
-                    if (chrome.runtime.lastError || !results || !results[0].result) {
-                        showMessage('Could not find a "next" button on the active media tab.', 'error');
-                    } else {
-                        showMessage(`Skipped track on: ${targetTab.title.substring(0, 20)}...`, 'info');
-                    }
-                });
-            });
-        }
-
-        // This function is injected into the media tab
-        // This function is injected into the media tab
-        function clickNextButtonOnPage() {
-            const selectors = [
-                // High-specificity selectors for major sites
-                '.ytp-next-button',                              // YouTube
-                'button[data-testid="control-button-skip-forward"]', // Spotify
-                '.player-controls__right button:nth-child(2)',   // YouTube Music
-                'button.buttons-player-next',                    // Apple Music
-        
-                // Generic attribute-based selectors
-                'button[aria-label*="Next"]', 'button[aria-label*="next"]',
-                'button[aria-label*="Skip"]', 'button[title*="Next"]',
-                'button[title*="next"]', 'button[data-testid*="next"]'
-            ];
-        
-            for (const selector of selectors) {
-                const buttons = document.querySelectorAll(selector);
-                for (const btn of buttons) {
-                    // Check if the button is actually visible and clickable
-                    const style = window.getComputedStyle(btn);
-                    if (style.display !== 'none' && style.visibility !== 'hidden' && !btn.disabled) {
-                        btn.click();
-                        return true; // Indicate success
-                    }
-                }
-            }
-            return false; // Indicate failure
-        }
-
-        // --- Event Listeners ---
-        document.addEventListener('DOMContentLoaded', () => {
-            // Initial setup
-            getCameras();
-            setInterval(getCPUInfo, 5000);
+async function getCameras() {
+    let tempStream = null;
+    try {
+        tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(d => d.kind === 'videoinput');
+        cameraSelect.innerHTML = '';
+        if (videoDevices.length === 0) { showMessage('No cameras found.', 'error'); return; }
+        videoDevices.forEach(d => {
+            const option = document.createElement('option');
+            option.value = d.deviceId;
+            option.textContent = d.label || `Camera ${cameraSelect.options.length + 1}`;
+            cameraSelect.appendChild(option);
         });
+        startCamera(cameraSelect.value);
+    } catch (err) {
+        showMessage(`Could not list cameras: ${err.name}: ${err.message}`, 'error');
+    } finally {
+        if (tempStream) tempStream.getTracks().forEach(track => track.stop());
+    }
+}
 
-        cameraSelect.addEventListener('change', () => startCamera(cameraSelect.value));
-        
-        fullscreenButton.addEventListener('click', () => {
-            if (!document.fullscreenElement) {
-                mainContentWrapper.requestFullscreen().catch(err => {
-                    showMessage(`Error entering fullscreen: ${err.message}`, 'error');
-                });
+// --- Chrome Extension API & System Info Functions ---
+function getCPUInfo() {
+    if (!chrome.system || !chrome.system.cpu) return;
+    chrome.system.cpu.getInfo(cpu => {
+        if (chrome.runtime.lastError || !cpu.temperatures || cpu.temperatures.length === 0) {
+            tempDisplay.textContent = "Temp: N/A"; return;
+        }
+        tempDisplay.textContent = `Temp: ${cpu.temperatures[0]}°C`;
+    });
+}
+
+function getNetworkSpeed() {
+    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (connection && connection.downlink) {
+        // downlink is in Mbps
+        wifiSpeedDisplay.textContent = `WiFi: ${connection.downlink.toFixed(2)} Mbps`;
+    } else {
+        wifiSpeedDisplay.textContent = 'WiFi: N/A';
+    }
+}
+
+// --- Recording Functions ---
+function startRecording() {
+    if (!currentStream) { showMessage('Camera not active.', 'error'); return; }
+    isRecording = true;
+    recordButton.classList.add('is-recording');
+    recordButtonText.textContent = 'Stop';
+    recordedChunks = [];
+    mediaRecorder = new MediaRecorder(currentStream, { mimeType: 'video/webm' });
+    mediaRecorder.ondataavailable = event => { if (event.data.size > 0) recordedChunks.push(event.data); };
+    mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `recording-${Date.now()}.webm`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showMessage('Recording saved!', 'info');
+    };
+    mediaRecorder.start();
+}
+
+function stopRecording() {
+    if (mediaRecorder) mediaRecorder.stop();
+    isRecording = false;
+    recordButton.classList.remove('is-recording');
+    recordButtonText.textContent = 'Record';
+}
+
+// --- Generic Media Control Functions ---
+function findAndExecuteScript(script, args, successCallback) {
+    const executeOnTab = (tab) => {
+        lastControlledTabId = tab.id;
+        chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            function: script,
+            args: args || []
+        }, (results) => {
+            if (chrome.runtime.lastError) {
+                // If the tab was closed or we lost permission, invalidate the ID
+                if (chrome.runtime.lastError.message.includes("No tab with id")) {
+                    lastControlledTabId = null;
+                }
+                console.error(chrome.runtime.lastError.message);
+                return;
+            }
+            if (successCallback) successCallback(results, tab);
+        });
+    };
+
+    // 1. Try the last controlled tab first
+    if (lastControlledTabId) {
+        chrome.tabs.get(lastControlledTabId, (tab) => {
+            if (chrome.runtime.lastError || !tab) {
+                lastControlledTabId = null; // Tab is gone, clear the ID
+                findAndExecuteScript(script, args, successCallback); // Retry without the ID
             } else {
-                document.exitFullscreen();
+                executeOnTab(tab);
             }
         });
+        return;
+    }
 
-        volumeSlider.addEventListener('input', e => { video.volume = e.target.value; });
-        brightnessSlider.addEventListener('input', e => setSystemBrightness(parseInt(e.target.value)));
-        
-        screenshotButton.addEventListener('click', takeTabScreenshot);
-        mediaNextButton.addEventListener('click', triggerMediaNext);
-        recordButton.addEventListener('click', () => {
-            isRecording ? stopRecording() : startRecording();
+    // 2. If no last tab, try the active YouTube tab
+    chrome.tabs.query({ active: true, url: "*://*.youtube.com/*" }, (tabs) => {
+        if (tabs.length > 0) {
+            executeOnTab(tabs[0]);
+        } else {
+            // 3. Fallback to any tab playing audio
+            chrome.tabs.query({ audible: true }, (audibleTabs) => {
+                if (audibleTabs.length > 0) {
+                    executeOnTab(audibleTabs[0]);
+                } else {
+                    showMessage('No active media tab found.', 'error');
+                }
+            });
+        }
+    });
+}
+
+
+// --- Specific Media Actions ---
+
+function setMediaVolume(level) {
+    // Also control local video feed volume
+    video.volume = level;
+
+    const setVolumeScript = (vol) => {
+        const videoEl = document.querySelector('video');
+        if (videoEl) {
+            videoEl.volume = vol;
+            return true;
+        }
+        return false;
+    };
+    findAndExecuteScript(setVolumeScript, [level]);
+}
+
+function toggleMediaPlayback() {
+    const togglePlaybackScript = () => {
+        const videoEl = document.querySelector('video');
+        if (!videoEl) return null;
+        if (videoEl.paused) {
+            videoEl.play();
+        } else {
+            videoEl.pause();
+        }
+        return videoEl.paused;
+    };
+
+    findAndExecuteScript(togglePlaybackScript, [], (results, tab) => {
+        if (results && results[0].result !== null) {
+            const isPaused = results[0].result;
+            mediaPauseButton.innerHTML = isPaused ? playIconSVG : pauseIconSVG;
+            showMessage(`Toggled playback on: ${tab.title.substring(0, 20)}...`, 'info');
+        } else {
+            showMessage('Could not find video on tab.', 'error');
+        }
+    });
+}
+
+function seekOnYoutube(direction) {
+    const seekScript = (dir) => {
+        const videoEl = document.querySelector('video');
+        if (!videoEl) return false;
+        videoEl.currentTime += (dir === 'forward' ? 10 : -10);
+        return true;
+    };
+    findAndExecuteScript(seekScript, [direction], (results, tab) => {
+        if (results && results[0].result) {
+            showMessage(`Seek ${direction} on ${tab.title.substring(0,20)}...`, 'info');
+        } else {
+            showMessage('Could not seek on YouTube tab.', 'error');
+        }
+    });
+}
+
+function skipMedia(direction) {
+    const clickButtonScript = (dir) => {
+        const prevSelectors = ['.ytp-prev-button', 'button[data-testid="control-button-skip-back"]', 'button[aria-label*="Previous"]'];
+        const nextSelectors = ['.ytp-next-button', 'button[data-testid="control-button-skip-forward"]', 'button[aria-label*="Next"]', 'button[aria-label*="Skip"]'];
+        const selectors = dir === 'next' ? nextSelectors : prevSelectors;
+        for (const selector of selectors) {
+            const btn = document.querySelector(selector);
+            if (btn) {
+                btn.click();
+                return true;
+            }
+        }
+        return false;
+    };
+
+    findAndExecuteScript(clickButtonScript, [direction], (results, tab) => {
+        const message = direction === 'next' ? 'Skipped to next' : 'Skipped to previous';
+        if (results && results[0].result) {
+            showMessage(`${message} on ${tab.title.substring(0,20)}...`, 'info');
+        } else {
+            showMessage(`Could not find a "${direction}" button.`, 'error');
+        }
+    });
+}
+
+
+// --- Event Listeners ---
+document.addEventListener('DOMContentLoaded', () => {
+    getCameras();
+    getCPUInfo();
+    getNetworkSpeed();
+    setInterval(getCPUInfo, 5000);
+    setInterval(getNetworkSpeed, 1000); // Update WiFi speed every second
+    mediaPauseButton.innerHTML = pauseIconSVG; // Set initial icon
+});
+
+cameraSelect.addEventListener('change', () => startCamera(cameraSelect.value));
+
+fullscreenButton.addEventListener('click', () => {
+    if (!document.fullscreenElement) {
+        mainContentWrapper.requestFullscreen().catch(err => {
+            showMessage(`Error entering fullscreen: ${err.message}`, 'error');
         });
+    } else {
+        document.exitFullscreen();
+    }
+});
+
+volumeSlider.addEventListener('input', e => setMediaVolume(parseFloat(e.target.value)));
+screenshotButton.addEventListener('click', takeTabScreenshot);
+recordButton.addEventListener('click', () => isRecording ? stopRecording() : startRecording());
+
+// Media Control Listeners
+mediaPauseButton.addEventListener('click', toggleMediaPlayback);
+mediaNextButton.addEventListener('click', () => skipMedia('next'));
+mediaPrevButton.addEventListener('click', () => skipMedia('prev'));
+youtubeRewindButton.addEventListener('click', () => seekOnYoutube('backward'));
+youtubeForwardButton.addEventListener('click', () => seekOnYoutube('forward'));

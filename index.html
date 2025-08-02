@@ -51,11 +51,11 @@
             transition: width 0.3s ease-in-out, padding 0.3s ease-in-out;
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
+            justify-content: flex-start; /* Align items to the top */
             align-items: center;
             flex-shrink: 0;
             box-sizing: border-box;
-            gap: 15px;
+            gap: 15px; /* Consistent gap between all items */
         }
 
         #mainContentWrapper:fullscreen .dock-panel {
@@ -143,28 +143,34 @@
             width: 100%;
             text-align: center;
         }
+        
+        .dock-item-group {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 100%;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #4a5568;
+        }
 
         .dock-panel .dock-item button {
             background-color: #4a7aa8;
             border: 1px solid #4a7aa8;
-            width: 43px; /* Increased button size to accommodate larger icon */
-            height: 43px; /* Increased button size to accommodate larger icon */
+            width: 43px; 
+            height: 43px;
             display: flex;
             justify-content: center;
             align-items: center;
             margin: 0 auto;
             color: #fff;
-            /* font-size: 1.5rem; This mainly affects text, not SVGs, so can be removed or kept for other text */
             border-radius: 33%;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
 
         .dock-panel .dock-item button svg {
-            width: 36px; /* Significantly increased size for icons */
-            height: 36px; /* Significantly increased size for icons */
-            /* Optionally add !important if absolutely necessary, but try without first */
-            /* width: 36px !important; */
-            /* height: 36px !important; */
+            width: 28px;
+            height: 28px; 
         }
     
         .dock-panel .dock-item button:hover {
@@ -190,77 +196,50 @@
           100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
         }
 
-        /* Vertical Slider Styling */
+        /* Vertical Slider Styling - Updated */
         .vertical-slider-container {
             display: flex;
             flex-direction: column;
             align-items: center;
-            flex-grow: 1;
             justify-content: center;
             padding: 5px 0;
-            /* Added some spacing for better visual separation in the example */
-            margin: 0 10px;
+            margin: 10px;
+            width: 100%;
+            flex-grow: 1; /* Make container take up space */
         }
         
         .vertical-slider {
-            width: 30px; /* Adjust as needed for desired thickness */
-            height: 100%;
-            background: #4a7aa8; /* Lighter shade of #154c7e for the unfilled track */
+            -webkit-appearance: slider-vertical; /* Orient slider vertically */
+            writing-mode: bt-lr; /* For Firefox */
+            width: 15px;
+            height: 100%; /* Fill the container height */
+            background: #4a5568;
             outline: none;
-            border-radius: 15px; /* Half of the width for rounded ends */
+            border-radius: 15px;
             cursor: pointer;
-            -webkit-appearance: none; /* Remove default WebKit styles */
-            appearance: none; /* Remove default styles */
-            margin: 0; /* Remove default margin */
-        
-            /* Fill from bottom up */
-            /* The linear-gradient now uses two colors: the fill color and the track color */
-            background-image: linear-gradient(to top, #154c7e var(--fill-percent, 0%), #4a7aa8 var(--fill-percent, 0%));
-            background-repeat: no-repeat;
-            background-size: 100% 100%; /* Ensure background covers the whole element */
-            background-position: bottom; /* Ensure fill starts from the bottom */
+            transition: background 0.2s ease-in-out;
+        }
+
+        .vertical-slider:hover {
+            background: #5a6a82;
         }
         
-        /* WebKit (Chrome, Safari, Edge) thumb styles - making it invisible */
         .vertical-slider::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
-            width: 0; /* Make width 0 */
-            height: 0; /* Make height 0 */
-            background: transparent; /* Make background transparent */
-            border: none; /* Remove any border */
-            box-shadow: none; /* Remove any shadow */
-            cursor: pointer; /* Keep cursor for interaction */
+            width: 25px;
+            height: 25px;
+            background: #154c7e;
+            border-radius: 50%;
+            border: 2px solid #fff;
         }
-        
-        /* Mozilla (Firefox) thumb styles - making it invisible */
+
         .vertical-slider::-moz-range-thumb {
-            width: 0; /* Make width 0 */
-            height: 0; /* Make height 0 */
-            background: transparent; /* Make background transparent */
-            border: none; /* Remove any border */
-            box-shadow: none; /* Remove any shadow */
-            cursor: pointer; /* Keep cursor for interaction */
-        }
-        
-        /* Track styles for Firefox (to ensure consistent thickness) */
-        .vertical-slider::-moz-range-track {
-            background: #4a7aa8; /* Lighter shade of #154c7e */
-            border-radius: 6px;
-            height: 12px; /* Match the slider width */
-        }
-        
-        /* Filled portion for Firefox */
-        .vertical-slider::-moz-range-progress {
-            background: #154c7e; /* Fill color */
-            border-radius: 6px;
-            height: 12px; /* Match the slider width */
-        }
-        
-        /* Focus state for accessibility */
-        .vertical-slider:focus {
-            outline: none;
-            box-shadow: 0 0 0 4px rgba(21, 76, 126, 0.3); /* Focus ring with the new color */
+            width: 25px;
+            height: 25px;
+            background: #154c7e;
+            border-radius: 50%;
+            border: 2px solid #fff;
         }
 
     </style>
@@ -270,12 +249,13 @@
         <div class="left-dock dock-panel">
             <div class="dock-item"><p id="fpsDisplay" class="font-bold">FPS: N/A</p></div>
             <div class="dock-item"><p id="tempDisplay" class="font-bold">Temp: N/A</p></div>
+            <div class="dock-item"><p id="wifiSpeedDisplay" class="font-bold">WiFi: N/A</p></div>
+
             <div class="vertical-slider-container">
                 <svg class="w-5 h-5 mb-1" fill="currentColor" viewBox="0 0 24 24"><path d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 10v4h3l4 4V6l-4 4H5z"/></svg>
                 <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="1" class="vertical-slider">
-                <p class="text-xs text-gray-500">(Video)</p>
+                <p class="text-xs text-gray-500">(Media)</p>
             </div>
-            <p class="text-xs text-gray-400 mt-auto">System Info</p>
         </div>
 
         <div class="video-container">
@@ -284,39 +264,46 @@
         </div>
 
         <div class="right-dock dock-panel">
-            <div class="dock-item">
-                <button id="recordButton"><svg viewBox="0 0 512 512" fill="currentColor" width="1em" height="1em"><path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512z"/></svg></button>
-                <p id="recordButtonText" class="text-xs">Record Tab</p>
+            <div class="dock-item-group">
+                <div class="dock-item">
+                    <button id="mediaPrevButton"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"></path></svg></button>
+                    <p class="text-xs">Previous</p>
+                </div>
+                <div class="dock-item">
+                    <button id="mediaPauseButton">
+                        <!-- The SVG icon will be managed by script.js -->
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"></path></svg>
+                    </button>
+                    <p class="text-xs">Pause/Play</p>
+                </div>
+                <div class="dock-item">
+                    <button id="mediaNextButton"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 18h2V6h-2M6 18l8.5-6L6 6v12z"></path></svg></button>
+                    <p class="text-xs">Next</p>
+                </div>
             </div>
 
-            <div class="dock-item">
-                <button id="mediaNextButton">
-                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
-                </button>
-                <p class="text-xs">Next Track</p>
+            <div class="dock-item-group">
+                 <div class="dock-item">
+                    <button id="youtubeRewindButton"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.99 5V1l-5 4 5 4V6c3.31 0 6 2.69 6 6s-2.69 6-6 6 -6-2.69-6-6H3.99c0 4.42 3.58 8 8 8s8-3.58 8-8 -3.58-8-8-8z"></path></svg></button>
+                    <p class="text-xs">-10s</p>
+                </div>
+                <div class="dock-item">
+                    <button id="youtubeForwardButton"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.99 5V1l-5 4 5 4V6c3.31 0 6 2.69 6 6s-2.69 6-6 6 -6-2.69-6-6H3.99c0 4.42 3.58 8 8 8s8-3.58 8-8 -3.58-8-8-8z" transform="scale(-1, 1) translate(-24, 0)"></path></svg></button>
+                    <p class="text-xs">+10s</p>
+                </div>
             </div>
             
-            <div class="dock-item">
-                <button id="screenshotButton">
-                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                </button>
-                <p class="text-xs">Screenshot</p>
+             <div class="dock-item-group" style="border-bottom: none; margin-top: auto;">
+                 <div class="dock-item">
+                    <button id="screenshotButton"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg></button>
+                    <p class="text-xs">Screenshot</p>
+                </div>
+                <div class="dock-item">
+                    <button id="recordButton"><svg viewBox="0 0 512 512" fill="currentColor"><path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512z"/></svg></button>
+                    <p id="recordButtonText" class="text-xs">Record</p>
+                </div>
+                <!-- Brightness Slider Removed -->
             </div>
-
-            <div class="vertical-slider-container">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/>
-                    <line x1="15" y1="12" x2="23" y2="12" />
-                    <line x1="13.5" y1="14.598" x2="17.5" y2="21.526" />
-                    <line x1="10.5" y1="14.598" x2="6.5" y2="21.526" />
-                    <line x1="9" y1="12" x2="1" y2="12" />
-                    <line x1="10.5" y1="9.402" x2="6.5" y2="2.474" />
-                    <line x1="13.5" y1="9.402" x2="17.5" y2="2.474" />
-                </svg><br>
-                <input type="range" id="brightnessSlider" min="0" max="1" step="0.01" value="0" class="vertical-slider">
-                <p class="text-xs text-gray-500">(System)</p>
-            </div>
-            <p class="text-xs text-gray-400 mt-auto">Tools</p>
         </div>
     </div>
 
