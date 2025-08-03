@@ -264,12 +264,25 @@ function seekOnYoutube(direction) {
     });
 }
 
-function skipMedia(direction) {
-    const clickButtonScript = (dir) => {
-        const prevSelectors = ['.ytp-prev-button', 'button[data-testid="control-button-skip-back"]', 'button[aria-label*="Previous"]'];
+function goBackInHistory() {
+    const goBackScript = () => {
+        window.history.back();
+        return true;
+    };
+    findAndExecuteScript(goBackScript, [], (results, tab) => {
+        if (results && results[0] && results[0].result) {
+            showMessage(`Navigating back on ${tab.title.substring(0,20)}...`, 'info');
+        } else {
+            showMessage(`Could not navigate back.`, 'error');
+        }
+    });
+}
+
+function skipMedia() {
+    const clickButtonScript = () => {
+        // "Previous" selectors have been removed
         const nextSelectors = ['.ytp-next-button', 'button[data-testid="control-button-skip-forward"]', 'button[aria-label*="Next"]', 'button[aria-label*="Skip"]'];
-        const selectors = dir === 'next' ? nextSelectors : prevSelectors;
-        for (const selector of selectors) {
+        for (const selector of nextSelectors) {
             const btn = document.querySelector(selector);
             if (btn) {
                 btn.click();
@@ -279,12 +292,11 @@ function skipMedia(direction) {
         return false;
     };
 
-    findAndExecuteScript(clickButtonScript, [direction], (results, tab) => {
-        const message = direction === 'next' ? 'Skipped to next' : 'Skipped to previous';
-        if (results && results[0].result) {
-            showMessage(`${message} on ${tab.title.substring(0,20)}...`, 'info');
+    findAndExecuteScript(clickButtonScript, [], (results, tab) => {
+        if (results && results[0] && results[0].result) {
+            showMessage(`Skipped to next on ${tab.title.substring(0,20)}...`, 'info');
         } else {
-            showMessage(`Could not find a "${direction}" button.`, 'error');
+            showMessage(`Could not find a "next" button.`, 'error');
         }
     });
 }
@@ -294,9 +306,18 @@ function skipMedia(direction) {
 document.addEventListener('DOMContentLoaded', () => {
     getCameras();
     getCPUInfo();
-    getNetworkSpeed();
-    setInterval(getCPUInfo, 5000);
-    setInterval(getNetworkSpeed, 1000); // Update WiFi speed every second
+    setInterval(getCPUInfo, 5000); // CPU info can still be polled
+
+    // New network speed logic
+    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (connection) {
+        getNetworkSpeed(); // Get initial speed
+        connection.addEventListener('change', getNetworkSpeed); // Update whenever the connection changes
+        setInterval(getNetworkSpeed, 5000); // Also poll every 5 seconds as a fallback
+    } else {
+        wifiSpeedDisplay.textContent = 'WiFi: N/A';
+    }
+
     mediaPauseButton.innerHTML = pauseIconSVG; // Set initial icon
 });
 
@@ -318,7 +339,7 @@ recordButton.addEventListener('click', () => isRecording ? stopRecording() : sta
 
 // Media Control Listeners
 mediaPauseButton.addEventListener('click', toggleMediaPlayback);
-mediaNextButton.addEventListener('click', () => skipMedia('next'));
-mediaPrevButton.addEventListener('click', () => skipMedia('prev'));
+mediaNextButton.addEventListener('click', skipMedia); // No longer needs an argument
+mediaPrevButton.addEventListener('click', goBackInHistory); // Call the new function
 youtubeRewindButton.addEventListener('click', () => seekOnYoutube('backward'));
 youtubeForwardButton.addEventListener('click', () => seekOnYoutube('forward'));
