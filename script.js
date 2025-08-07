@@ -16,6 +16,7 @@ const mediaPauseButton = document.getElementById('mediaPauseButton');
 const mediaPrevButton = document.getElementById('mediaPrevButton');
 const youtubeRewindButton = document.getElementById('youtubeRewindButton');
 const youtubeForwardButton = document.getElementById('youtubeForwardButton');
+const audioSelect = document.getElementById('audioSelect');
 
 // State
 let currentStream, messageTimeoutId, fpsCallbackId, mediaRecorder;
@@ -57,15 +58,121 @@ function startAccurateFpsCounter() {
     if (video.readyState >= 2) fpsCallbackId = video.requestVideoFrameCallback(cb);
 }
 
-async function startCamera(deviceId) {
-    stopCurrentStream();
-    const constraints = { video: { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } } };
+async function getMediaDevices() {
+    let tempStream = null;
     try {
+        // Request both to get permissions and a full device list
+        tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        
+        // Clear existing options
+        cameraSelect.innerHTML = '';
+        audioSelect.innerHTML = '';
+
+        const videoDevices = devices.filter(d => d.kind === 'videoinput');
+        const audioDevices = devices.filter(d => d.kind === 'audioinput');
+
+        if (videoDevices.length === 0) {
+            showMessage('No cameras found.', 'error');
+        } else {
+            videoDevices.forEach(d => {
+                const option = document.createElement('option');
+                option.value = d.deviceId;
+                option.textContent = d.label || `Camera ${cameraSelect.options.length + 1}`;
+                cameraSelect.appendChild(option);
+            });
+        }
+
+        if (audioDevices.length === 0) {
+            showMessage('No audio input devices found.', 'error');
+        } else {
+            audioDevices.forEach(d => {
+                const option = document.createElement('option');
+                option.value = d.deviceId;
+                option.textContent = d.label || `Audio Input ${audioSelect.options.length + 1}`;
+                // Prioritize capture card audio
+                if (d.label.toLowerCase().includes('capture') || d.label.toLowerCase().includes('hdmi')) {
+                    option.selected = true;
+                }
+                audioSelect.appendChild(option);
+            });
+        }
+        
+        // Start the stream with the default or selected devices
+        if (videoDevices.length > 0 && audioDevices.length > 0) {
+            startStream(cameraSelect.value, audioSelect.value);
+        }
+
+    } catch (err) {
+        showMessage(`Could not list devices: ${err.name}: ${err.message}`, 'error');
+        // If permission was denied, explain how to fix it
+        if (err.name === "NotAllowedError") {
+             showMessage('Camera/Mic permission denied. Please allow access in your browser settings.', 'error', 10000);
+        }
+    } finally {
+        // Stop the temporary stream used to get permissions
+        if (tempStream) tempStream.getTracks().forEach(track => track.stop());
+    }
+}
+
+
+// In script.js, replace the entire startStream function with this one:
+
+async function startStream(videoDeviceId, audioDeviceId) {
+    stopCurrentStream(); // This function already exists and works as is
+
+    // Define advanced audio constraints for high-quality, low-latency sound
+    const constraints = {
+        video: {
+            deviceId: { exact: videoDeviceId },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+        },
+        audio: {
+            deviceId: { exact: audioDeviceId },
+            // --- Key Audio Quality Optimizations ---
+
+            // 1. Disable processing that degrades non-voice audio
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+
+            // 2. Request a standard high sample rate
+            sampleRate: { ideal: 48000 },
+
+            // 3. Prioritize low latency to reduce stuttering
+            latency: { ideal: 0.01 }
+        }
+    };
+
+    try {
+        // Attempt to get the stream with our ideal settings
         currentStream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = currentStream;
-        video.onloadedmetadata = () => { video.play(); startAccurateFpsCounter(); };
+        video.muted = false; // Ensure audio is audible
+        video.onloadedmetadata = () => {
+            video.play();
+            startAccurateFpsCounter(); // This function already exists
+        };
     } catch (err) {
-        showMessage(`Error starting camera: ${err.message}`, 'error');
+        showMessage(`Error starting stream: ${err.message}`, 'error');
+
+        // If the advanced settings are not supported, try again with basic settings
+        if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
+             showMessage('Advanced audio settings not supported. Retrying with defaults...', 'info', 5000);
+             const fallbackConstraints = {
+                 video: constraints.video,
+                 audio: { deviceId: { exact: audioDeviceId } }
+             };
+             try {
+                currentStream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+                video.srcObject = currentStream;
+                video.muted = false;
+                video.onloadedmetadata = () => video.play();
+             } catch (fallbackErr) {
+                showMessage(`Fallback stream failed: ${fallbackErr.message}`, 'error');
+             }
+        }
     }
 }
 
@@ -82,28 +189,6 @@ function takeTabScreenshot() {
     link.download = `capture-${Date.now()}.png`;
     link.click();
     showMessage('Screenshot saved!', 'info', 2000);
-}
-
-async function getCameras() {
-    let tempStream = null;
-    try {
-        tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = devices.filter(d => d.kind === 'videoinput');
-        cameraSelect.innerHTML = '';
-        if (videoDevices.length === 0) { showMessage('No cameras found.', 'error'); return; }
-        videoDevices.forEach(d => {
-            const option = document.createElement('option');
-            option.value = d.deviceId;
-            option.textContent = d.label || `Camera ${cameraSelect.options.length + 1}`;
-            cameraSelect.appendChild(option);
-        });
-        startCamera(cameraSelect.value);
-    } catch (err) {
-        showMessage(`Could not list cameras: ${err.name}: ${err.message}`, 'error');
-    } finally {
-        if (tempStream) tempStream.getTracks().forEach(track => track.stop());
-    }
 }
 
 // --- Chrome Extension API & System Info Functions ---
@@ -207,7 +292,6 @@ function findAndExecuteScript(script, args, successCallback) {
     });
 }
 
-
 // --- Specific Media Actions ---
 
 function setMediaVolume(level) {
@@ -301,27 +385,31 @@ function skipMedia() {
     });
 }
 
-
 // --- Event Listeners ---
-document.addEventListener('DOMContentLoaded', () => {
-    getCameras();
-    getCPUInfo();
-    setInterval(getCPUInfo, 5000); // CPU info can still be polled
 
-    // New network speed logic
+document.addEventListener('DOMContentLoaded', () => {
+    // This single function now handles getting all devices and starting the stream
+    getMediaDevices(); 
+    
+    getCPUInfo();
+    setInterval(getCPUInfo, 5000);
+
     const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
     if (connection) {
-        getNetworkSpeed(); // Get initial speed
-        connection.addEventListener('change', getNetworkSpeed); // Update whenever the connection changes
-        setInterval(getNetworkSpeed, 5000); // Also poll every 5 seconds as a fallback
+        getNetworkSpeed();
+        connection.addEventListener('change', getNetworkSpeed);
+        setInterval(getNetworkSpeed, 5000);
     } else {
         wifiSpeedDisplay.textContent = 'WiFi: N/A';
     }
 
-    mediaPauseButton.innerHTML = pauseIconSVG; // Set initial icon
+    mediaPauseButton.innerHTML = pauseIconSVG;
 });
 
-cameraSelect.addEventListener('change', () => startCamera(cameraSelect.value));
+// This function starts a new stream whenever the selection changes for either device
+function handleDeviceChange() {
+    startStream(cameraSelect.value, audioSelect.value);
+}
 
 fullscreenButton.addEventListener('click', () => {
     if (!document.fullscreenElement) {
@@ -343,3 +431,5 @@ mediaNextButton.addEventListener('click', skipMedia); // No longer needs an argu
 mediaPrevButton.addEventListener('click', goBackInHistory); // Call the new function
 youtubeRewindButton.addEventListener('click', () => seekOnYoutube('backward'));
 youtubeForwardButton.addEventListener('click', () => seekOnYoutube('forward'));
+cameraSelect.addEventListener('change', handleDeviceChange);
+audioSelect.addEventListener('change', handleDeviceChange);
